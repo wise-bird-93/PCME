@@ -1,0 +1,18 @@
+﻿{
+  "manifest_version": 3,
+  "name": "PCME Usage Tracker",
+  "version": "1.0.0",
+  "description": "Tracks active website usage for PCME.",
+  "permissions": [
+    "tabs",
+    "idle",
+    "storage",
+    "windows"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
