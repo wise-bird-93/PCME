@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect,useState } from "react";
 
 type ActivityCategory =
   | "Education"
@@ -19,6 +19,19 @@ type Activity = {
   start: string;
   end: string;
   durationSeconds: number;
+};
+
+type UsageItem = {
+  platform: string;
+  totalSeconds: number;
+  sessionCount: number;
+};
+
+type UsageAnalytics = {
+  date: string;
+  totalActiveSeconds: number;
+  applications: UsageItem[];
+  websites: UsageItem[];
 };
 
 const categories: ActivityCategory[] = [
@@ -86,6 +99,9 @@ function getDateRange(period: string, selectedDate: string) {
 export default function Home() {
   const [activePage, setActivePage] = useState("Overview");
   const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
+  const [analytics, setAnalytics] = useState<UsageAnalytics | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [activities] = useState<Activity[]>([]);
   const [connectedDevices] = useState<string[]>([]);
   const [showCategories, setShowCategories] = useState(false);
@@ -105,15 +121,59 @@ export default function Home() {
     return { category, seconds };
   });
 
-  const totalSeconds = categoryTotals.reduce(
-    (sum, item) => sum + item.seconds,
-    0
-  );
+  const applicationTotals = analytics?.applications ?? [];
+  const websiteTotals = analytics?.websites ?? [];
+
+  const totalSeconds = analytics?.totalActiveSeconds ?? 0;
 
   const dateLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString(
     "en-IN",
     { day: "numeric", month: "long", year: "numeric" }
   );
+
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const email = process.env.NEXT_PUBLIC_PCME_EMAIL;
+
+        if (!apiUrl || !email) {
+          throw new Error("API URL or email is missing from .env.local");
+        }
+
+        const params = new URLSearchParams({
+          email,
+          startDate: range.start,
+          endDate: range.end,
+          timezoneOffset: String(new Date().getTimezoneOffset()),
+        });
+
+        const response = await fetch(
+          `${apiUrl}/usage/analytics?${params.toString()}`
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || "Failed to fetch analytics");
+        }
+
+        setAnalytics(result.data);
+      } catch (err) {
+        setAnalytics(null);
+        setError(
+          err instanceof Error ? err.message : "Something went wrong"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+  }, [activePage,selectedDate]);
 
   return (
     <main className="pcme-app">
@@ -198,17 +258,25 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="notice">
-            <span className="notice-icon">i</span>
-            <div>
-              <strong>Frontend prototype</strong>
-              <p>
-                No activity data has been connected yet. Totals will appear
-                after the backend starts receiving and saving real activity
-                records.
-              </p>
+          {loading && (
+            <div className="notice">
+              <span className="notice-icon">i</span>
+              <div>
+                <strong>Loading activity</strong>
+                <p>Fetching your activity records...</p>
+              </div>
             </div>
-          </div>
+          )}
+
+          {error && (
+            <div className="notice">
+              <span className="notice-icon">!</span>
+              <div>
+                <strong>Unable to load activity</strong>
+                <p>{error}</p>
+              </div>
+            </div>
+          )}
 
           {activePage === "Overview" && (
             <>
@@ -235,7 +303,10 @@ export default function Home() {
                     <span>Activity records</span>
                     <span className="stat-icon green">▤</span>
                   </div>
-                  <h3>{filteredActivities.length}</h3>
+                  <h3>
+                    {applicationTotals.reduce((sum, item) => sum + item.sessionCount, 0) +
+                      websiteTotals.reduce((sum, item) => sum + item.sessionCount, 0)}
+                  </h3>
                   <p>Records in the selected period</p>
                 </div>
 
@@ -319,44 +390,52 @@ export default function Home() {
                 </section>
 
                 <section className="panel sync-panel">
-                  <div className="panel-heading">
-                    <div>
-                      <h2>Across your devices</h2>
-                      <p>One account, one shared history</p>
-                    </div>
-                    <span className="stat-icon purple">⌘</span>
-                  </div>
+  <div className="panel-heading">
+    <div>
+      <h2>Your activity</h2>
+      <p>Real usage tracked on your computer</p>
+    </div>
+    <span className="stat-icon purple">⌘</span>
+  </div>
 
-                  <div className="device-preview">
-                    <span className="device-symbol">▱</span>
-                    <div>
-                      <strong>Laptop</strong>
-                      <p>Waiting for device registration</p>
-                    </div>
-                    <span className="pending-tag">Pending</span>
-                  </div>
+  <h3>Applications</h3>
 
-                  <div className="device-preview">
-                    <span className="device-symbol">▯</span>
-                    <div>
-                      <strong>Phone</strong>
-                      <p>Waiting for device registration</p>
-                    </div>
-                    <span className="pending-tag">Pending</span>
-                  </div>
+  {applicationTotals.length > 0 ? (
+    applicationTotals.map((item) => (
+      <div className="device-preview" key={item.platform}>
+        <span className="device-symbol">▱</span>
+        <div>
+          <strong>{item.platform}</strong>
+          <p>{item.sessionCount} sessions</p>
+        </div>
+        <span className="pending-tag">
+          {formatDuration(item.totalSeconds)}
+        </span>
+      </div>
+    ))
+  ) : (
+    <p>No application activity recorded.</p>
+  )}
 
-                  <p className="sync-note">
-                    Multi-device synchronization will be enabled after account
-                    authentication and backend APIs are implemented.
-                  </p>
+  <h3>Websites</h3>
 
-                  <button
-                    className="secondary-button full-button"
-                    onClick={() => setActivePage("Devices")}
-                  >
-                    View devices
-                  </button>
-                </section>
+  {websiteTotals.length > 0 ? (
+    websiteTotals.map((item) => (
+      <div className="device-preview" key={item.platform}>
+        <span className="device-symbol">🌐</span>
+        <div>
+          <strong>{item.platform}</strong>
+          <p>{item.sessionCount} sessions</p>
+        </div>
+        <span className="pending-tag">
+          {formatDuration(item.totalSeconds)}
+        </span>
+      </div>
+    ))
+  ) : (
+    <p>No website activity recorded.</p>
+  )}
+</section>
               </div>
 
               <div className="section-heading lower-heading">
@@ -418,11 +497,41 @@ export default function Home() {
                 <p>Calculated from activity records for this date.</p>
               </div>
 
-              {filteredActivities.length === 0 ? (
-                <EmptyReport />
-              ) : (
-                <ActivityTable activities={filteredActivities} />
-              )}
+              <div className="dashboard-grid">
+  <section className="panel sync-panel">
+    <h3>Applications</h3>
+    {applicationTotals.length > 0 ? (
+      applicationTotals.map((item) => (
+        <div className="device-preview" key={item.platform}>
+          <div>
+            <strong>{item.platform}</strong>
+            <p>{item.sessionCount} sessions</p>
+          </div>
+          <strong>{formatDuration(item.totalSeconds)}</strong>
+        </div>
+      ))
+    ) : (
+      <p>No application activity recorded.</p>
+    )}
+  </section>
+
+  <section className="panel sync-panel">
+    <h3>Websites</h3>
+    {websiteTotals.length > 0 ? (
+      websiteTotals.map((item) => (
+        <div className="device-preview" key={item.platform}>
+          <div>
+            <strong>{item.platform}</strong>
+            <p>{item.sessionCount} sessions</p>
+          </div>
+          <strong>{formatDuration(item.totalSeconds)}</strong>
+        </div>
+      ))
+    ) : (
+      <p>No website activity recorded.</p>
+    )}
+  </section>
+</div>
             </section>
           )}
 

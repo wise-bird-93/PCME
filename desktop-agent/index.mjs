@@ -10,7 +10,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const idleScript = path.join(currentDir, "idle-check.ps1");
 const sessionsFile = path.join(currentDir, "pendingSessions.json");
 
-const PCME_EMAIL = "YOUR_CONNECTED_GMAIL@gmail.com";
+const PCME_EMAIL = "YOUR_CONNECTED_EMAIL@gmail.com";
 const API_URL = "http://localhost:5000/usage/sessions";
 
 let currentSession = null;
@@ -57,7 +57,7 @@ async function getPendingSessions() {
 async function uploadPendingSessions() {
     if (isUploading) return;
 
-    if (PCME_EMAIL === "YOUR_EMAIL@gmail.com") {
+    if (!PCME_EMAIL || PCME_EMAIL.includes("YOUR_CONNECTED")) {
         console.error("Configure PCME_EMAIL first.");
         return;
     }

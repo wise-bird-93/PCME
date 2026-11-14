@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const gmailRoutes = require("./routes/gmailRoutes");
 const usageRoutes = require("./routes/usageRoutes");
+const analyticsRoutes = require("./routes/analyticsRoutes");
 
 require("dotenv").config();
 
@@ -11,6 +12,7 @@ app.use(cors());
 app.use(express.json());
 app.use(gmailRoutes);
 app.use(usageRoutes);
+app.use(analyticsRoutes);
 
 app.get("/", (req, res) => {
     res.json({

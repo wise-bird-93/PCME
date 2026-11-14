@@ -2,7 +2,7 @@
 console.log("PCME Usage Tracker - Backend Connected");
 
 // Replace this with the Gmail account connected to PCME.
-const PCME_EMAIL = "YOUR_CONNECTED_GMAIL@gmail.com";
+const PCME_EMAIL = "YOUR_CONNECTED_EMAIL@gmail.com";
 const API_URL = "http://localhost:5000/usage/sessions";
 
 let isWindowFocused = true;
@@ -61,7 +61,8 @@ async function getActiveDomain() {
 async function uploadUsageSessions() {
     if (isUploading) return;
 
-    if (PCME_EMAIL === "YOUR_EMAIL@gmail.com") {
+    if (
+        !PCME_EMAIL || PCME_EMAIL.includes("YOUR_CONNECTED")) {
         console.error("Please configure PCME_EMAIL first.");
         return;
     }
