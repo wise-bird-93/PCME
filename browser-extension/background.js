@@ -1,10 +1,10 @@
-importScripts("./config.js");
+﻿importScripts("./config.js");
 
 console.log("PCME Usage Tracker - Backend Connected");
 
 // Replace this with the Gmail account connected to PCME.
 const PCME_EMAIL = globalThis.PCME_EMAIL;
-const API_URL = "http://localhost:5000/usage/sessions";
+const API_URL = "https://pcme.onrender.com/usage/sessions";
 
 let isWindowFocused = true;
 let userState = "active";

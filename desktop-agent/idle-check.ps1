@@ -13,9 +13,7 @@ public static class IdleTime
     }
 
     [DllImport("user32.dll")]
-    private static extern bool GetLastInputInfo(
-        ref LASTINPUTINFO info
-    );
+    private static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
 
     public static uint GetIdleMilliseconds()
     {
@@ -25,18 +23,47 @@ public static class IdleTime
         if (!GetLastInputInfo(ref info))
             return 0;
 
-        return unchecked(
-            (uint)Environment.TickCount - info.dwTime
-        );
+        return unchecked((uint)Environment.TickCount - info.dwTime);
     }
 }
 "@
 
+$lastRecord = (Get-WinEvent -FilterHashtable @{
+    LogName = 'System'
+    ProviderName = 'Microsoft-Windows-Kernel-Power'
+    Id = 506, 507
+} -MaxEvents 1 -ErrorAction SilentlyContinue).RecordId
+
+if ($null -eq $lastRecord) {
+    $lastRecord = 0
+}
+
 while ($true) {
     $idle = [IdleTime]::GetIdleMilliseconds()
-    $seconds = [math]::Floor($idle / 1000)
+    Write-Output ([math]::Floor($idle / 1000))
 
-    Write-Output $seconds
+    $events = Get-WinEvent -FilterHashtable @{
+        LogName = 'System'
+        ProviderName = 'Microsoft-Windows-Kernel-Power'
+        Id = 506, 507
+    } -MaxEvents 10 -ErrorAction SilentlyContinue
+
+    foreach ($event in ($events | Sort-Object RecordId)) {
+        if ($event.RecordId -le $lastRecord) {
+            continue
+        }
+
+        $timestamp = ([DateTimeOffset]$event.TimeCreated).ToUnixTimeMilliseconds()
+
+        if ($event.Id -eq 506) {
+            Write-Output "SLEEP_START|$timestamp"
+        }
+        elseif ($event.Id -eq 507) {
+            Write-Output "SLEEP_END|$timestamp"
+        }
+
+        $lastRecord = $event.RecordId
+    }
 
     Start-Sleep -Seconds 1
 }

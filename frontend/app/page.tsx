@@ -30,6 +30,9 @@ type UsageItem = {
 type UsageAnalytics = {
   date: string;
   totalActiveSeconds: number;
+  totalIdleSeconds: number;
+  totalLockedSeconds: number;
+  totalSleepSeconds: number;
   applications: UsageItem[];
   websites: UsageItem[];
 };
@@ -138,13 +141,21 @@ export default function Home() {
     return { category, seconds };
   });
 
-  const applicationTotals = analytics?.applications ?? [];
+  const applicationTotals = (analytics?.applications ?? []).filter(
+    (item) =>
+      !["idle", "locked", "sleep", "lockapp.exe"].includes(
+        item.platform.toLowerCase()
+      )
+  );
   const websiteTotals = analytics?.websites ?? [];
   const visibleTimeline = showAllTimeline
   ? timeline
   : timeline.slice(-5);
 
   const totalSeconds = analytics?.totalActiveSeconds ?? 0;
+  const idleSeconds = analytics?.totalIdleSeconds ?? 0;
+  const lockedSeconds = analytics?.totalLockedSeconds ?? 0;
+  const sleepSeconds = analytics?.totalSleepSeconds ?? 0;
 
   const dateLabel = new Date(`${selectedDate}T12:00:00`).toLocaleDateString(
     "en-IN",
@@ -357,6 +368,33 @@ export default function Home() {
 
                 <div className="stat-card">
                   <div className="stat-top">
+                    <span>Idle time</span>
+                    <span className="stat-icon green">◷</span>
+                  </div>
+                  <h3>{formatDuration(idleSeconds)}</h3>
+                  <p>Time away from the keyboard</p>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span>Locked time</span>
+                    <span className="stat-icon purple">🔒</span>
+                  </div>
+                  <h3>{formatDuration(lockedSeconds)}</h3>
+                  <p>Time spent on the lock screen</p>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-top">
+                    <span>Sleep time</span>
+                    <span className="stat-icon blue">🌙</span>
+                  </div>
+                  <h3>{formatDuration(sleepSeconds)}</h3>
+                  <p>Time your computer was asleep</p>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-top">
                     <span>Activity records</span>
                     <span className="stat-icon green">▤</span>
                   </div>
@@ -399,8 +437,8 @@ export default function Home() {
                       <h3>Applications</h3>
 
                       {applicationTotals.length > 0 ? (
-                        applicationTotals.map((item) => (
-                          <div className="category-row" key={item.platform}>
+                        applicationTotals.map((item, index) => (
+                          <div className="category-row" key={`${item.platform}-${index}`}>
                             <div className="category-info">
                               <span>{item.platform}</span>
                               <strong>{formatDuration(item.totalSeconds)}</strong>
@@ -442,8 +480,8 @@ export default function Home() {
                   <h3>Applications</h3>
 
                   {applicationTotals.length > 0 ? (
-                    applicationTotals.map((item) => (
-                      <div className="device-preview" key={item.platform}>
+                    applicationTotals.map((item, index) => (
+                      <div className="device-preview" key={`${item.platform}-${index}`}>
                         <span className="device-symbol">▱</span>
                         <div>
                           <strong>{item.platform}</strong>
