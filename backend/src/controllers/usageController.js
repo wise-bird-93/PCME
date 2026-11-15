@@ -18,7 +18,8 @@ const saveUsageSessions = async (req, res) => {
             startTime: new Date(session.startTime),
             endTime: new Date(session.endTime),
             durationSeconds: session.durationSeconds,
-            source: session.source || "browser"
+            source: session.source || "browser",
+            activityType: session.activityType || "active",
         }));
 
         const savedSessions = await UsageSession.insertMany(records);
@@ -65,7 +66,7 @@ const getUsageTimeline = async (req, res) => {
             startTime: { $gte: start, $lt: end }
         })
             .sort({ startTime: 1 })
-            .select("platform source startTime endTime durationSeconds -_id");
+            .select("platform source activityType startTime endTime durationSeconds -_id");
 
         return res.status(200).json({
             success: true,

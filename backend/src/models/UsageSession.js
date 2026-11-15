@@ -26,6 +26,11 @@ const usageSessionSchema = new mongoose.Schema(
             required: true,
             min: 0
         },
+        activityType: {
+            type: String,
+            enum: ["active", "idle", "locked", "sleep"],
+            default: "active"
+        },
         source: {
             type: String,
             enum: ["browser", "desktop"],

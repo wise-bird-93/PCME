@@ -70,7 +70,8 @@ const getUsageAnalytics = async (req, res) => {
                 $group: {
                     _id: {
                         platform: "$platform",
-                        source: "$source"
+                        source: "$source",
+                        activityType: "$activityType"
                     },
                     totalSeconds: {
                         $sum: "$durationSeconds"
@@ -86,8 +87,28 @@ const getUsageAnalytics = async (req, res) => {
         const websites = [];
 
         let totalActiveSeconds = 0;
+        let totalIdleSeconds = 0;
+        let totalLockedSeconds = 0;
+        let totalSleepSeconds = 0;
 
         for (const session of sessions) {
+            const activityType = session._id.activityType || "active";
+
+            if (activityType === "idle") {
+                totalIdleSeconds += session.totalSeconds;
+                continue;
+            }
+
+            if (activityType === "locked") {
+                totalLockedSeconds += session.totalSeconds;
+                continue;
+            }
+
+            if (activityType === "sleep") {
+                totalSleepSeconds += session.totalSeconds;
+                continue;
+            }
+
             const item = {
                 platform: session._id.platform,
                 totalSeconds: session.totalSeconds,
@@ -109,6 +130,9 @@ const getUsageAnalytics = async (req, res) => {
                 startDate: fromDate,
                 endDate: toDate,
                 totalActiveSeconds,
+                totalIdleSeconds,
+                totalLockedSeconds,
+                totalSleepSeconds,
                 applications,
                 websites
             }
