@@ -8,3 +8,5 @@ pendingSessions.json
 **/.env.local
 browser-extension/config.js
 desktop-agent/config.js
+
+desktop-agent/config.mjs
