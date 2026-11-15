@@ -6,3 +6,5 @@ pendingSessions.json
 **/.env
 .env.local
 **/.env.local
+browser-extension/config.js
+desktop-agent/config.js

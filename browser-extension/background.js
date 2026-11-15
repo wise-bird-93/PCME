@@ -1,8 +1,9 @@
-﻿
+importScripts("./config.js");
+
 console.log("PCME Usage Tracker - Backend Connected");
 
 // Replace this with the Gmail account connected to PCME.
-const PCME_EMAIL = "[REDACTED]";
+const PCME_EMAIL = globalThis.PCME_EMAIL;
 const API_URL = "http://localhost:5000/usage/sessions";
 
 let isWindowFocused = true;
@@ -230,3 +231,4 @@ async function initializeTracker() {
 }
 
 initializeTracker();
+

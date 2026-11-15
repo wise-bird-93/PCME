@@ -1,3 +1,4 @@
+import { PCME_EMAIL } from "./config.mjs";
 
 import activeWindow from "active-win";
 import { spawn } from "child_process";
@@ -10,7 +11,7 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const idleScript = path.join(currentDir, "idle-check.ps1");
 const sessionsFile = path.join(currentDir, "pendingSessions.json");
 
-const PCME_EMAIL = "[REDACTED]";
+
 const API_URL = "http://localhost:5000/usage/sessions";
 
 let currentSession = null;
@@ -220,3 +221,5 @@ uploadPendingSessions();
 process.on("exit", () => {
     idleProcess.kill();
 });
+
+
