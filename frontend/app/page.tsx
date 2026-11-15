@@ -34,6 +34,14 @@ type UsageAnalytics = {
   websites: UsageItem[];
 };
 
+type TimelineSession = {
+  platform: string;
+  source: "browser" | "desktop";
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+};
+
 const categories: ActivityCategory[] = [
   "Education",
   "Coding",
@@ -61,11 +69,18 @@ const navItems = [
 ];
 
 function formatDuration(seconds: number) {
+  if (seconds < 60) {
+    return `${seconds}s`;
+  }
+
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
 
-  if (hours === 0) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
 }
 
 function getLocalDate(date: Date) {
@@ -100,6 +115,8 @@ export default function Home() {
   const [activePage, setActivePage] = useState("Overview");
   const [selectedDate, setSelectedDate] = useState(getLocalDate(new Date()));
   const [analytics, setAnalytics] = useState<UsageAnalytics | null>(null);
+  const [timeline, setTimeline] = useState<TimelineSession[]>([]);
+  const [showAllTimeline, setShowAllTimeline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activities] = useState<Activity[]>([]);
@@ -123,6 +140,9 @@ export default function Home() {
 
   const applicationTotals = analytics?.applications ?? [];
   const websiteTotals = analytics?.websites ?? [];
+  const visibleTimeline = showAllTimeline
+  ? timeline
+  : timeline.slice(-5);
 
   const totalSeconds = analytics?.totalActiveSeconds ?? 0;
 
@@ -174,6 +194,43 @@ export default function Home() {
 
     fetchAnalytics();
   }, [activePage,selectedDate]);
+
+  useEffect(() => {
+    const fetchTimeline = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const email = process.env.NEXT_PUBLIC_PCME_EMAIL;
+
+        if (!apiUrl || !email) {
+          throw new Error("API URL or email is missing");
+        }
+
+        const params = new URLSearchParams({
+          email,
+          date: selectedDate,
+          timezoneOffset: String(new Date().getTimezoneOffset()),
+        });
+
+        const response = await fetch(
+          `${apiUrl}/usage/timeline?${params.toString()}`
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || "Failed to fetch timeline");
+        }
+
+        setTimeline(result.data);
+      } catch (err) {
+        console.error("Timeline fetch error:", err);
+        setTimeline([]);
+      }
+    };
+
+    setShowAllTimeline(false);
+    fetchTimeline();
+  }, [selectedDate]);
 
   return (
     <main className="pcme-app">
@@ -324,118 +381,163 @@ export default function Home() {
                 <section className="panel category-panel">
                   <div className="panel-heading">
                     <div>
-                      <h2>Time by category</h2>
-                      <p>How your tracked time is distributed</p>
+                      <h2>Application & Website Usage</h2>
+                      <p>Breakdown of your actual tracked activity</p>
                     </div>
-                    <button
-                      className="text-button"
-                      onClick={() => setShowCategories(!showCategories)}
-                    >
-                      {showCategories ? "Show less" : "View categories"}
-                    </button>
                   </div>
 
-                  {totalSeconds === 0 ? (
+                  {applicationTotals.length === 0 && websiteTotals.length === 0 ? (
                     <div className="empty-state">
                       <div className="empty-illustration">◷</div>
                       <h3>No activity data yet</h3>
                       <p>
-                        Once activity records are saved, this chart will show
-                        your actual time by category.
+                        Your tracked applications and websites will appear here.
                       </p>
                     </div>
                   ) : (
                     <div className="category-list">
-                      {categoryTotals
-                        .filter((item) => item.seconds > 0)
-                        .map((item) => (
-                          <div className="category-row" key={item.category}>
+                      <h3>Applications</h3>
+
+                      {applicationTotals.length > 0 ? (
+                        applicationTotals.map((item) => (
+                          <div className="category-row" key={item.platform}>
                             <div className="category-info">
-                              <span
-                                className="category-dot"
-                                style={{
-                                  backgroundColor:
-                                    categoryColors[item.category],
-                                }}
-                              />
-                              <span>{item.category}</span>
-                              <strong>
-                                {formatDuration(item.seconds)}
-                              </strong>
-                            </div>
-                            <div className="progress-track">
-                              <div
-                                className="progress-fill"
-                                style={{
-                                  width: `${
-                                    (item.seconds / totalSeconds) * 100
-                                  }%`,
-                                  backgroundColor:
-                                    categoryColors[item.category],
-                                }}
-                              />
+                              <span>{item.platform}</span>
+                              <strong>{formatDuration(item.totalSeconds)}</strong>
                             </div>
                           </div>
-                        ))}
-                    </div>
-                  )}
+                        ))
+                      ) : (
+                        <p>No application activity recorded.</p>
+                      )}
 
-                  {showCategories && (
-                    <div className="category-chips">
-                      {categories.map((category) => (
-                        <span key={category}>{category}</span>
-                      ))}
+                      <h3>Websites</h3>
+
+                      {websiteTotals.length > 0 ? (
+                        websiteTotals.map((item) => (
+                          <div className="category-row" key={item.platform}>
+                            <div className="category-info">
+                              <span>{item.platform}</span>
+                              <strong>{formatDuration(item.totalSeconds)}</strong>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p>No website activity recorded.</p>
+                      )}
                     </div>
                   )}
                 </section>
 
+
                 <section className="panel sync-panel">
-  <div className="panel-heading">
-    <div>
-      <h2>Your activity</h2>
-      <p>Real usage tracked on your computer</p>
-    </div>
-    <span className="stat-icon purple">⌘</span>
-  </div>
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Your activity</h2>
+                      <p>Real usage tracked on your computer</p>
+                    </div>
+                    <span className="stat-icon purple">⌘</span>
+                  </div>
 
-  <h3>Applications</h3>
+                  <h3>Applications</h3>
 
-  {applicationTotals.length > 0 ? (
-    applicationTotals.map((item) => (
-      <div className="device-preview" key={item.platform}>
-        <span className="device-symbol">▱</span>
-        <div>
-          <strong>{item.platform}</strong>
-          <p>{item.sessionCount} sessions</p>
-        </div>
-        <span className="pending-tag">
-          {formatDuration(item.totalSeconds)}
-        </span>
-      </div>
-    ))
-  ) : (
-    <p>No application activity recorded.</p>
-  )}
+                  {applicationTotals.length > 0 ? (
+                    applicationTotals.map((item) => (
+                      <div className="device-preview" key={item.platform}>
+                        <span className="device-symbol">▱</span>
+                        <div>
+                          <strong>{item.platform}</strong>
+                          <p>{item.sessionCount} sessions</p>
+                        </div>
+                        <span className="pending-tag">
+                          {formatDuration(item.totalSeconds)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No application activity recorded.</p>
+                  )}
 
-  <h3>Websites</h3>
+                  <h3>Websites</h3>
 
-  {websiteTotals.length > 0 ? (
-    websiteTotals.map((item) => (
-      <div className="device-preview" key={item.platform}>
-        <span className="device-symbol">🌐</span>
-        <div>
-          <strong>{item.platform}</strong>
-          <p>{item.sessionCount} sessions</p>
-        </div>
-        <span className="pending-tag">
-          {formatDuration(item.totalSeconds)}
-        </span>
-      </div>
-    ))
-  ) : (
-    <p>No website activity recorded.</p>
-  )}
-</section>
+                  {websiteTotals.length > 0 ? (
+                    websiteTotals.map((item) => (
+                      <div className="device-preview" key={item.platform}>
+                        <span className="device-symbol">🌐</span>
+                        <div>
+                          <strong>{item.platform}</strong>
+                          <p>{item.sessionCount} sessions</p>
+                        </div>
+                        <span className="pending-tag">
+                          {formatDuration(item.totalSeconds)}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p>No website activity recorded.</p>
+                  )}
+                </section>
+                <section className="panel sync-panel">
+                  <div className="panel-heading">
+                    <div>
+                      <h2>Activity Timeline</h2>
+                      <p>Your tracked activity in chronological order</p>
+                    </div>
+                    <span className="stat-icon purple">◷</span>
+                  </div>
+
+                  {timeline.length === 0 ? (
+                    <div className="empty-state">
+                      <h3>No activity recorded</h3>
+                      <p>Your tracked sessions will appear here.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="category-list">
+                        {visibleTimeline.map((session, index) => (
+                          <div
+                            className="device-preview"
+                            key={`${session.startTime}-${index}`}
+                          >
+                            <span className="device-symbol">
+                              {session.source === "desktop" ? "▱" : "🌐"}
+                            </span>
+
+                            <div>
+                              <strong>{session.platform}</strong>
+                              <p>
+                                {session.source === "desktop" ? "Application" : "Website"}
+                                {" · "}
+                                {new Date(session.startTime).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                                {" – "}
+                                {new Date(session.endTime).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </p>
+                            </div>
+
+                            <span className="pending-tag">
+                              {formatDuration(session.durationSeconds)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {timeline.length > 5 && (
+                        <button
+                          className="view-all-btn"
+                          onClick={() => setShowAllTimeline(!showAllTimeline)}
+                        >
+                          {showAllTimeline ? "Show Less" : "View All"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </section>
               </div>
 
               <div className="section-heading lower-heading">
@@ -662,6 +764,7 @@ function CategorySummary({
         </div>
       ))}
     </div>
+    
   );
 }
 

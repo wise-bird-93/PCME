@@ -10,12 +10,13 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const idleScript = path.join(currentDir, "idle-check.ps1");
 const sessionsFile = path.join(currentDir, "pendingSessions.json");
 
-const PCME_EMAIL = "YOUR_CONNECTED_EMAIL@gmail.com";
+const PCME_EMAIL = "[REDACTED]";
 const API_URL = "http://localhost:5000/usage/sessions";
 
 let currentSession = null;
 let idleSeconds = 0;
 let isUploading = false;
+let isTracking = false;
 
 const idleProcess = spawn(
     "powershell.exe",
@@ -111,20 +112,26 @@ async function uploadPendingSessions() {
     }
 }
 
+
 async function endCurrentSession(endTime = Date.now()) {
     if (!currentSession) return;
 
+    const sessionToEnd = currentSession;
+    currentSession = null;
+
     const durationSeconds = Math.floor(
-        (endTime - currentSession.startTime) / 1000
+        (endTime - sessionToEnd.startTime) / 1000
     );
 
-    if (durationSeconds >= 1) {
+    if (durationSeconds < 1) return;
+
+    try {
         const sessions = await getPendingSessions();
 
         sessions.push({
             localId: crypto.randomUUID(),
-            appName: currentSession.appName,
-            startTime: currentSession.startTime,
+            appName: sessionToEnd.appName,
+            startTime: sessionToEnd.startTime,
             endTime,
             durationSeconds
         });
@@ -135,17 +142,23 @@ async function endCurrentSession(endTime = Date.now()) {
         );
 
         console.log("Session completed:", {
-            appName: currentSession.appName,
+            appName: sessionToEnd.appName,
             durationSeconds
         });
 
         await uploadPendingSessions();
-    }
 
-    currentSession = null;
+    } catch (error) {
+        console.error("Session save error:", error);
+    }
 }
 
+
 async function trackActiveApplication() {
+    if (isTracking) return;
+
+    isTracking = true;
+
     try {
         if (idleSeconds >= 60) {
             if (currentSession) {
@@ -159,7 +172,15 @@ async function trackActiveApplication() {
         const window = await activeWindow();
         const currentApp = window?.owner?.name || null;
 
-        if (!currentApp) {
+        if (currentApp !== currentSession?.appName) {
+            console.log("Foreground application detected:", {
+                appName: window?.owner?.name,
+                appPath: window?.owner?.path,
+                processId: window?.owner?.processId
+            });
+        }
+
+        if (!currentApp || currentApp === "LockApp.exe") {
             if (currentSession) {
                 await endCurrentSession();
             }
@@ -183,6 +204,8 @@ async function trackActiveApplication() {
 
     } catch (error) {
         console.error("Detection error:", error);
+    } finally {
+        isTracking = false;
     }
 }
 

@@ -127,19 +127,29 @@ router.get("/auth/google/callback", async (req, res) => {
 
 router.get("/gmail/emails", async (req, res) => {
     try {
-        const account = await GmailAccount.findOne();
+        const email = req.query.email?.toLowerCase();
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email query parameter is required"
+            });
+        }
+
+        const account = await GmailAccount.findOne({ email });
 
         if (!account) {
             return res.status(404).json({
                 success: false,
-                message: "No Gmail account connected"
+                message: "This Gmail account is not connected"
             });
         }
 
-        const emails = await fetchRecentEmails(account.email, 10);
+        const emails = await fetchRecentEmails(email, 10);
 
         res.json({
             success: true,
+            email,
             count: emails.length,
             data: emails
         });
